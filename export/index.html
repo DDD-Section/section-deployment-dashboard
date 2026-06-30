@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Section Coach — Completion Export</title>
+<style>
+  :root {
+    --blue: #1a56db; --blue-dark: #1543ad; --ink: #111827; --muted: #6b7280;
+    --line: #e5e7eb; --bg: #f3f4f6; --ok: #047857; --warn: #b45309;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Google Sans", Helvetica, Arial, sans-serif;
+    margin: 0; background: var(--bg); color: var(--ink); line-height: 1.5; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 80px; }
+  header h1 { font-size: 22px; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-top: 20px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  input[type=password], select { width: 100%; padding: 11px 12px; font-size: 14px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; background: #fff; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  button { font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: none; border-radius: 8px; padding: 11px 18px; background: var(--blue); color: #fff; }
+  button:hover { background: var(--blue-dark); }
+  button:disabled { opacity: .55; cursor: default; }
+  button.secondary { background: #fff; color: var(--blue); border: 1px solid var(--blue); }
+  button.secondary:hover { background: #f0f5ff; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .error { color: #b91c1c; font-size: 13px; margin-top: 10px; display: none; }
+  .hidden { display: none; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .stats { display: flex; gap: 28px; flex-wrap: wrap; margin: 4px 0 18px; }
+  .stat .n { font-size: 26px; font-weight: 700; }
+  .stat .l { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .export-block { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-top: 14px; }
+  .export-block h3 { margin: 0 0 4px; font-size: 15px; }
+  .export-block p { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: 1px; }
+  .badge.ok { background: #ecfdf5; color: var(--ok); }
+  .badge.warn { background: #fffbeb; color: var(--warn); }
+  .note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 13px; border-radius: 8px; padding: 12px 14px; margin-top: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 12px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { background: #f9fafb; font-weight: 600; position: sticky; top: 0; }
+  .scroll { max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; margin-top: 12px; }
+  .preview-note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .meta { font-size: 12px; color: var(--muted); }
+  .tabs { display: flex; gap: 6px; margin-top: 18px; }
+  .tabs button { background: #fff; color: var(--muted); border: 1px solid var(--line); padding: 7px 14px; font-size: 13px; }
+  .tabs button.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Section Coach — Completion Export</h1>
+    <p>Export per-user course, completion, and certificate data for upload to your LMS (e.g. Workday Learning). Runs entirely in your browser.</p>
+  </header>
+
+  <!-- SETUP -->
+  <div id="setup" class="card">
+    <div class="row">
+      <div style="flex:1; min-width:260px">
+        <label for="key">Section API key</label>
+        <input type="password" id="key" placeholder="Paste your Section API key" autocomplete="off">
+      </div>
+      <div style="width:200px">
+        <label for="period">Time period</label>
+        <select id="period">
+          <option value="CONTRACT_TO_DATE" selected>Contract to date</option>
+          <option value="LAST_90_DAYS">Last 90 days</option>
+          <option value="LAST_30_DAYS">Last 30 days</option>
+        </select>
+      </div>
+      <button id="connectBtn">Pull data</button>
+    </div>
+    <div class="hint">Your key is stored only in this browser and is sent only to Section's API (<code>prof.ai</code>) to authorize the data pull. It never goes anywhere else.</div>
+    <div id="setupError" class="error"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results" class="card hidden">
+    <div class="topbar">
+      <div class="meta" id="fetchMeta"></div>
+      <button class="secondary" id="signout">Clear key &amp; reset</button>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="export-block">
+      <h3>Certificates <span id="certBadge" class="badge"></span></h3>
+      <p>One row per user &times; certificate, including <code>completion_date</code> &mdash; the only Section field that carries a true completion date, and the grain most LMS completion records use.</p>
+      <button id="dlCerts">Download certificates CSV</button>
+    </div>
+
+    <div class="export-block">
+      <h3>Course engagement</h3>
+      <p>One row per user &times; course: engagement status (Enrolled / Watched Lessons / Completed), session, videos watched, badges earned. Note: course rows carry status, not a completion date.</p>
+      <button id="dlCourses">Download course engagement CSV</button>
+    </div>
+
+    <div class="export-block">
+      <h3>User summary</h3>
+      <p>One row per user: views, courses completed, badges, plus onboarding and program status.</p>
+      <button id="dlUsers">Download user summary CSV</button>
+    </div>
+
+    <div id="emptyNote" class="note hidden"></div>
+
+    <div class="tabs" id="tabs"></div>
+    <div class="scroll"><table id="preview"></table></div>
+    <div class="preview-note" id="previewNote"></div>
+  </div>
+</div>
+
+<script>
+const BASE_URL = 'https://prof.ai';
+const STORAGE_KEY = 'section_dashboard_api_key';
+const PERIOD_KEY = 'section_export_period';
+let DATA = null, ACTIVE_TAB = 'certs';
+
+function getHeaders(apiKey) {
+  return { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
+}
+
+async function post(apiKey, path, body) {
+  const r = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers: getHeaders(apiKey), body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`${path} returned ${r.status}`);
+  return r.json();
+}
+
+function colsOf(rows, prepend = []) {
+  const cols = [...prepend];
+  rows.forEach(r => Object.keys(r).forEach(k => { if (!cols.includes(k)) cols.push(k); }));
+  return cols;
+}
+
+function toCSV(rows, columns) {
+  const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const lines = [columns.map(esc).join(',')];
+  for (const r of rows) lines.push(columns.map(c => esc(r[c])).join(','));
+  return lines.join('\r\n');
+}
+
+function download(filename, text) {
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+async function pull(apiKey, period) {
+  const tp = { time_period: period, output: 'json' };
+  const [courseMap, certMap, employees, profai] = await Promise.all([
+    post(apiKey, '/v1/reports/employee-course-map', tp),
+    post(apiKey, '/v1/reports/employee-certificate-map', tp),
+    post(apiKey, '/v1/reports/employees', tp),
+    post(apiKey, '/v1/reports/profai', { output: 'json', include_skills: false, include_use_cases: false }),
+  ]);
+
+  const profByEmail = {};
+  (profai || []).forEach(u => { const e = (u.user_email || '').toLowerCase(); if (e) profByEmail[e] = u; });
+
+  // user summary = v1 employees enriched with profai onboarding/program/created_at
+  const users = (employees || []).map(r => {
+    const p = profByEmail[(r.email || '').toLowerCase()] || {};
+    return { ...r, onboarded: p.onboarded ?? '', program_completed: p.program_completed ?? '', user_created_at: p.user_created_at ?? '' };
+  });
+
+  // documented certificate schema — used as header fallback when no certificates exist yet
+  const CERT_SCHEMA = ['userId', 'name', 'email', 'status', 'certificate_id', 'title', 'certificate_completed', 'completion_date'];
+  const courseCols = colsOf(courseMap);
+  const certCols = certMap.length ? colsOf(certMap) : CERT_SCHEMA;
+  const userCols = colsOf(users);
+
+  const completedCourses = courseMap.filter(r => String(r.engagement) === 'Completed').length;
+
+  return {
+    fetched_at: new Date().toISOString(), period,
+    courseMap, courseCols, certMap, certCols, users, userCols,
+    counts: {
+      users: users.length,
+      enrollments: courseMap.length,
+      coursesCompleted: completedCourses,
+      certificates: certMap.length,
+    },
+  };
+}
+
+function setActiveTab(tab) {
+  ACTIVE_TAB = tab;
+  const map = { certs: ['certMap', 'certCols'], courses: ['courseMap', 'courseCols'], users: ['users', 'userCols'] };
+  const [rowsKey, colsKey] = map[tab];
+  const rows = DATA[rowsKey].slice(0, 100), cols = DATA[colsKey];
+  document.getElementById('preview').innerHTML =
+    '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>' +
+    rows.map(r => '<tr>' + cols.map(c => `<td>${(r[c] ?? '').toString().replace(/</g, '&lt;')}</td>`).join('') + '</tr>').join('');
+  document.getElementById('previewNote').textContent =
+    `Preview: first ${rows.length} of ${DATA[rowsKey].length} ${tab} rows. Full data is in the CSV download.`;
+  [...document.querySelectorAll('#tabs button')].forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+}
+
+function renderResults() {
+  document.getElementById('setup').classList.add('hidden');
+  document.getElementById('results').classList.remove('hidden');
+
+  const periodLabel = { CONTRACT_TO_DATE: 'Contract to date', LAST_90_DAYS: 'Last 90 days', LAST_30_DAYS: 'Last 30 days' }[DATA.period];
+  document.getElementById('fetchMeta').textContent = `Pulled live from prof.ai (v1 API) · ${periodLabel} · ${new Date(DATA.fetched_at).toLocaleString()}`;
+
+  const c = DATA.counts;
+  document.getElementById('stats').innerHTML = [
+    ['Users', c.users], ['Course enrollments', c.enrollments],
+    ['Courses completed', c.coursesCompleted], ['Certificates', c.certificates],
+  ].map(([l, n]) => `<div class="stat"><div class="n">${n.toLocaleString()}</div><div class="l">${l}</div></div>`).join('');
+
+  const cb = document.getElementById('certBadge');
+  if (c.certificates > 0) { cb.textContent = `${c.certificates} with completion dates`; cb.className = 'badge ok'; }
+  else { cb.textContent = 'none yet'; cb.className = 'badge warn'; }
+
+  const note = document.getElementById('emptyNote');
+  if (c.certificates === 0) {
+    note.classList.remove('hidden');
+    note.innerHTML = '<strong>No certificates earned yet.</strong> The certificate report is the only source of a true <code>completion_date</code>. Until users earn certificates, the dated export will be empty — course rows carry completion <em>status</em> but no date.';
+  } else note.classList.add('hidden');
+
+  document.getElementById('tabs').innerHTML = [['certs', 'Certificates'], ['courses', 'Course engagement'], ['users', 'User summary']]
+    .map(([t, l]) => `<button data-tab="${t}">${l}</button>`).join('');
+  [...document.querySelectorAll('#tabs button')].forEach(b => b.addEventListener('click', () => setActiveTab(b.dataset.tab)));
+  setActiveTab('certs');
+}
+
+function stamp() { return new Date().toISOString().slice(0, 10); }
+
+async function connect() {
+  const key = document.getElementById('key').value.trim();
+  const period = document.getElementById('period').value;
+  const btn = document.getElementById('connectBtn'), err = document.getElementById('setupError');
+  if (!key) { err.textContent = 'Please paste your Section API key.'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Pulling…'; err.style.display = 'none';
+  try {
+    DATA = await pull(key, period);
+    localStorage.setItem(STORAGE_KEY, key);
+    localStorage.setItem(PERIOD_KEY, period);
+    renderResults();
+  } catch (e) {
+    const m = e.message || '';
+    err.textContent = m.includes('401') ? 'Invalid API key. Check it and try again.'
+      : m.includes('403') ? 'Access denied. This key may be expired or lack reporting access.'
+      : `Pull failed: ${m}`;
+    err.style.display = 'block';
+  } finally { btn.disabled = false; btn.textContent = 'Pull data'; }
+}
+
+document.getElementById('connectBtn').addEventListener('click', connect);
+document.getElementById('key').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+document.getElementById('dlCerts').addEventListener('click', () => download(`section-certificates-${stamp()}.csv`, toCSV(DATA.certMap, DATA.certCols)));
+document.getElementById('dlCourses').addEventListener('click', () => download(`section-course-engagement-${stamp()}.csv`, toCSV(DATA.courseMap, DATA.courseCols)));
+document.getElementById('dlUsers').addEventListener('click', () => download(`section-user-summary-${stamp()}.csv`, toCSV(DATA.users, DATA.userCols)));
+document.getElementById('signout').addEventListener('click', () => {
+  localStorage.removeItem(STORAGE_KEY); DATA = null;
+  document.getElementById('results').classList.add('hidden');
+  document.getElementById('setup').classList.remove('hidden');
+  document.getElementById('key').value = '';
+});
+
+(function () {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) document.getElementById('key').value = saved;
+  const p = localStorage.getItem(PERIOD_KEY);
+  if (p) document.getElementById('period').value = p;
+})();
+</script>
+</body>
+</html>

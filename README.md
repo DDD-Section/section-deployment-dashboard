@@ -34,9 +34,24 @@ All POST requests to `https://prof.ai`:
 | `/v0/reports/employees` | CSV | Per-user video/course/badge counts |
 | `/v0/reports/employee-course-map` | CSV | User-to-course mapping |
 
+## Completion Export (`/export/`)
+
+A companion single-page tool for exporting per-user course, completion, and certificate data
+as CSV — for upload into an LMS such as Workday Learning. Same API key, same browser-only model,
+no charts. Open `export/index.html` (or the `/export/` path when hosted) and download:
+
+- **Certificates** (`/v1/reports/employee-certificate-map`) — one row per user × certificate,
+  including `completion_date`. This is the only report that carries a true completion date, and
+  the right source for LMS completion records.
+- **Course engagement** (`/v1/reports/employee-course-map`) — one row per user × course with
+  engagement status (Enrolled / Watched Lessons / Completed). Course rows carry status, not a date.
+- **User summary** (`/v1/reports/employees`) — per-user views, completions, badges, and status.
+
+See `export/README.md` for details.
+
 ## Deploy
 
-Host `index.html` anywhere that serves static files.
+Host `index.html` (and the `export/` folder) anywhere that serves static files.
 
 ## License
 
